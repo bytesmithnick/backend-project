@@ -206,4 +206,79 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 })
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken } 
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body
+
+    const user = await User.findById(req.user?._id)
+
+    const isPassCorrect = await user.isPasswordCorrect(oldPassword)
+
+    if (!isPassCorrect) {
+        throw new ApiError(400, 'Invalid old password')
+    }
+
+    user.password = newPassword
+    await user.save({ validateBeforeSave: false })
+
+    return res.status(200).json(
+        new ApiResponse(200, {}, 'Password changed successfully')
+    )
+})
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res.status(200).json(200, req.user, 'Current user fetched successfully')
+})
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+    const { userName } = req.body
+
+    if (!userName) {
+        throw new ApiError(400, 'User Name is required')
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                userName
+            }
+        },
+        { new: true }
+    ).select('-password')
+    return res.status(200).json(new ApiResponse(200, user, 'User details updated successfully'))
+})
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+    const avatarLocalPath = req.file?.path
+
+    if (!avatarLocalPath) {
+        throw new ApiError(400, 'Avatar file is missing')
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+    if (!avatar.url) {
+        throw new ApiError(400, 'Error while uploading Avatar')
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                avatar: avatar.url
+            }
+        },
+        { new: true }
+    ).select('-password')
+    return res.status(200).json(new ApiResponse(200, user, 'Avatar updated Successfully'))
+
+})
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateUserDetails
+} 
